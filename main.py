@@ -122,7 +122,7 @@ def get_role_assignment_by_subscription(
     role_assignments: List[RoleAssignment],
     subscription_name: Optional[str] = None,
     subscription_number: Optional[str] = None,
-    role_type: Optional[RoleType] = None
+    role_type: Optional[str] = None
 ) -> RoleAssignment:
     """
     Filter the eligible role assignments by subscription name, number (prefix) and/or role type

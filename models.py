@@ -20,12 +20,6 @@ class PIMRequest(BaseModel):
     payload: Optional[dict] = None
 
 
-class RoleType(str, Enum):
-    OWNER = "Owner"
-    OMNIA_OWNER = "Omnia Owner"
-    OMNIA_CONTRIB = "Omnia Contributor"
-
-
 class RoleAssignmentSubject(BaseModel):
     id: str
     type: str
