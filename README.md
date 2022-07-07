@@ -38,3 +38,18 @@ Options:
   --help                          Show this message and exit.
 
 ```
+
+### Creating an alias for ease-of-use
+1. Create a virtual environment in the project directory: `$ python3 -m venv .venv`
+2. Activate the virtual environment: `$ source .venv/bin/activate`
+3. Install the required dependencies: `$ pip install -r requirements.txt`
+4. Add an alias to your shell's `.rc` file (e.g. `~/.bashrc`, `~/.zshrc`, etc.)
+```bash
+alias pim-activator='<PATH_TO_PROJECT_SRC>/.venv/bin/python3 <PATH_TO_PROJECT_SRC>/main.py activate'
+# e.g.
+alias pim-activator='~/projects/etc/az-pim-role-helper/.venv/bin/python3 ~/projects/etc/az-pim-role-helper/main.py activate'
+```
+5. Source the `.rc` file
+6. Run `pim-activator`
+  - `$ pim-activator --help`
+  - `$ pim-activator -t <tenant_id> -n S398 -r owner`
