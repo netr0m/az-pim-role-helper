@@ -131,12 +131,19 @@ def get_role_assignment_by_subscription(
         matches = []
         for role_assignment in role_assignments:
             role_resource_name = role_assignment.roleDefinition.resource.displayName.lower()
-            if subscription_name and subscription_name in role_resource_name:
-                matches.append(role_assignment)
-            elif subscription_number and subscription_number == role_resource_name[0:4]:
-                matches.append(role_assignment)
-        if role_type:
-            matches = list(filter(lambda role_assignment: role_type.lower() in role_assignment.roleDefinition.displayName.lower(), matches))
+            role_resource_type = role_assignment.roleDefinition.displayName.lower()
+            if subscription_name and subscription_name.lower() in role_resource_name:
+                if not role_type:
+                    matches.append(role_assignment)
+                    continue
+                if role_type.lower() in role_resource_type:
+                    matches.append(role_assignment)
+            elif subscription_number and subscription_number.lower() == role_resource_name[0:4]:
+                if not role_type:
+                    matches.append(role_assignment)
+                    continue
+                if role_type.lower() in role_resource_type:
+                    matches.append(role_assignment)
         if len(matches) != 1:
             print(f"Unable to determine subscription based on filters. Got {len(matches)} potential matches.")
             print([f"{match.roleDefinition.resource.displayName} ({match.roleDefinition.displayName})" for match in matches])
@@ -156,14 +163,36 @@ def cli():
     pass
 
 
-@cli.command()
-@click.option("-t", "--tenant-id", default=TENANT_ID, help="The tenant ID in which the Azure subscription exists")
-@click.option("-s", "--subscription-name", help="The name of the subscription to activate")
-@click.option("-n", "--subscription-number", help="The name (prefix) of the subscription to activate (e.g. 'S398')")
-@click.option(
-    "-r", "--role-type",
-    help="Specify the role type to activate if multiple roles are found for a subscription. (e.g. 'Owner' or 'Contributor')"
-)
+class BaseCommand(click.Command):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.params.insert(0, click.Option(("-t", "--tenant-id"), default=TENANT_ID, help="The tenant ID in which the Azure subscription exists"))
+        self.params.insert(1, click.Option(("-s", "--subscription-name"), help="The name of the subscription to activate"))
+        self.params.insert(2, click.Option(("-n", "--subscription-number"), help="The name (prefix) of the subscription to activate (e.g. 'S398')"))
+        self.params.insert(3, click.Option(("-r", "--role-type"),
+            help="Specify the role type to activate if multiple roles are found for a subscription. (e.g. 'Owner' or 'Contributor')"
+        ))
+
+
+@cli.command(cls=BaseCommand)
+def list(tenant_id: str, subscription_name: str = None, subscription_number: str = None, role_type: str = None):
+    # TODO: Add filtering
+    try:
+        if not tenant_id:
+            raise ValueError("You must provide a value for 'tenant_id'.")
+        pim_token, subject = get_pim_access_token(tenant_id)
+        subject_id = subject.get("id")
+        role_assignments = get_role_assignments(subject_id, token=pim_token)
+        for role_assignment in role_assignments:
+            print(f"- {role_assignment.roleDefinition.resource.displayName}: {role_assignment.roleDefinition.displayName}")
+    except KeyboardInterrupt:
+        sys.exit(1)
+    except ValueError as err:
+        print(err)
+        sys.exit(1)
+
+
+@cli.command(cls=BaseCommand)
 def activate(tenant_id: str, subscription_name: str = None, subscription_number: str = None, role_type: str = None):
     try:
         if not tenant_id:

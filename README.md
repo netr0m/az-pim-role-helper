@@ -12,6 +12,12 @@ $ pip install -r requirements.txt
     - Can be specified as either an environment variable (`TENANT_ID=1234[...]`), or via the `-t / --tenant-id` option.
 
 ## Usage
+The `list` command takes a single named argument:
+- `-t, --tenant-id`: The tenantId of your tenant
+```bash
+$ python3 main.py list -t <tenant_id>
+```
+
 The `activate` command takes four arguments:
 - `-t, --tenant-id`: The tenantId of your tenant
 - `-s, --subscription-name`: The (partial) name of the subscription to activate. E.g. `data-tool`
@@ -45,11 +51,11 @@ Options:
 3. Install the required dependencies: `$ pip install -r requirements.txt`
 4. Add an alias to your shell's `.rc` file (e.g. `~/.bashrc`, `~/.zshrc`, etc.)
 ```bash
-alias pim-activator='<PATH_TO_PROJECT_SRC>/.venv/bin/python3 <PATH_TO_PROJECT_SRC>/main.py activate'
+alias pim='<PATH_TO_PROJECT_SRC>/.venv/bin/python3 <PATH_TO_PROJECT_SRC>/main.py'
 # e.g.
-alias pim-activator='~/projects/etc/az-pim-role-helper/.venv/bin/python3 ~/projects/etc/az-pim-role-helper/main.py activate'
+alias pim='~/projects/etc/az-pim-role-helper/.venv/bin/python3 ~/projects/etc/az-pim-role-helper/main.py'
 ```
 5. Source the `.rc` file
-6. Run `pim-activator`
-  - `$ pim-activator --help`
-  - `$ pim-activator -t <tenant_id> -n S398 -r owner`
+6. Run `pim`
+  - List all eligible roles: `$ pim list -t <tenant_id>`
+  - Activate a role: `$ pim activate -t <tenant_id> -n S398 -r owner`
