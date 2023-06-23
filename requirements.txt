@@ -1,3 +1,4 @@
-pydantic
-requests
-azure-identity
+pydantic==1.10.9
+requests==2.31.0
+azure-identity==1.13.0
+click==8.1.3

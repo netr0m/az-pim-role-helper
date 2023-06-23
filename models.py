@@ -1,16 +1,15 @@
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel
 
 from const import DEFAULT_DURATION_MINUTES, DEFAULT_REASON
 
 
-class ResourceType(str, Enum):
-    AZURE_RESOURCES = "azureResources"
+ResourceType = Literal["azureResources"]
 
 
 class PIMRequest(BaseModel):
-    resource_type: ResourceType = ResourceType.AZURE_RESOURCES
+    resource_type: ResourceType = "azureResources"
     path: str
     token: str
     method: str = "GET"
@@ -55,13 +54,13 @@ class RoleAssignment(BaseModel):
 
 
 class RoleAssignmentsResponse(BaseModel):
-    value: List[RoleAssignment]
+    value: list[RoleAssignment]
 
 
 class RoleAssignmentSchedule(BaseModel):
     type: str = "Once"
-    startDateTime: str = None
-    endDateTime: str = None
+    startDateTime: Optional[str] = None
+    endDateTime: Optional[str] = None
     duration: str = f"PT{DEFAULT_DURATION_MINUTES}M"
 
 
@@ -74,7 +73,7 @@ class RoleAssignmentRequest(BaseModel):
     reason: str = DEFAULT_REASON
     ticketNumber: str = ""
     ticketSystem: str = ""
-    schedule: RoleAssignmentSchedule = RoleAssignmentSchedule().dict()
+    schedule: dict[str, Any] = RoleAssignmentSchedule().dict()
     linkedEligibleRoleAssignmentId: str
     scopedResourceId: str = ""
 
@@ -82,7 +81,7 @@ class RoleAssignmentRequest(BaseModel):
 class RoleAssignmentRequestStatus(BaseModel):
     status: str
     subStatus: str
-    statusDetails: List[Dict[str, str]]
+    statusDetails: list[dict[str, str]]
 
 
 class RoleAssignmentRequestResponse(BaseModel):

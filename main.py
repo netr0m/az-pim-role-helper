@@ -1,8 +1,7 @@
 import os
 import sys
-from enum import Enum
-from typing import Dict, List, Optional, Tuple
-from requests import HTTPError, post, Request, Session
+from typing import Optional, Tuple
+from requests import HTTPError, Request, Session
 from azure.identity import InteractiveBrowserCredential
 import click
 
@@ -17,7 +16,7 @@ from const import (
 TENANT_ID = os.getenv("TENANT_ID")
 
 
-def get_pim_access_token(tenant_id: str) -> Tuple[str, Dict[str, str]]:
+def get_pim_access_token(tenant_id: str) -> Tuple[str, dict[str, str]]:
     """
     Retrieve an access token for Azure PIM through interactive authentication
 
@@ -27,6 +26,9 @@ def get_pim_access_token(tenant_id: str) -> Tuple[str, Dict[str, str]]:
         print("Opening browser for Interactive Authentication...")
         credentials = InteractiveBrowserCredential(tenant_id=tenant_id, authority=AZ_AUTHORITY)
         token = credentials.get_token(AZ_PIM_SCOPE).token
+        if not credentials._auth_record:
+            raise
+
         subject = {"id": credentials._auth_record.home_account_id.split(".")[0], "email": credentials._auth_record.username}
         print(f"Authenticated as {subject.get('email')}")
         return token, subject
@@ -42,7 +44,7 @@ def pim_request(request: PIMRequest):
     session = Session()
     try:
         url = f"{AZ_RBAC_PIM_BASE_URL}/{AZ_RBAC_PIM_BASE_PATH}/{request.resource_type}/{request.path}"
-        headers = request.headers
+        headers = request.headers or {}
         headers["Authorization"] = f"Bearer {request.token}"
 
         _req = Request(
@@ -59,14 +61,15 @@ def pim_request(request: PIMRequest):
         return response.json()
     except HTTPError as http_err:
         print(f"Response with status code {http_err.response.status_code} received:")
-        if http_err.response.headers["Content-Type"] == "application/json":
+        print(f"{http_err.__class__.__name__}: {http_err}")
+        if http_err.response.headers.get("Content-Type") == "application/json":
             print(http_err.response.json())
         else:
             print(http_err.response.text)
         sys.exit(1)
 
 
-def get_role_assignments(subject_id: str, resource_type: str = ResourceType.AZURE_RESOURCES, token: str = None) -> List[RoleAssignment]:
+def get_role_assignments(subject_id: str, token: str, resource_type: ResourceType = "azureResources") -> list[RoleAssignment]:
     """
     Retrieve a list of eligible role assignments for the signed-in user
     """
@@ -92,8 +95,7 @@ def get_role_assignments(subject_id: str, resource_type: str = ResourceType.AZUR
 def request_role_assignment(
     subject_id: str, subscription_id: str,
     role_definition_id: str, role_assignment_id: str,
-    resource_type: str = ResourceType.AZURE_RESOURCES,
-    token: str = None
+    token: str, resource_type: ResourceType = "azureResources",
 ):
     """
     Request the activation of the given role assignment
@@ -109,7 +111,7 @@ def request_role_assignment(
     response = pim_request(PIMRequest(
         resource_type=resource_type,
         path=path,
-        payload=payload,
+        payload=payload.dict(),
         token=token
     ))
 
@@ -119,7 +121,7 @@ def request_role_assignment(
 
 
 def get_role_assignment_by_subscription(
-    role_assignments: List[RoleAssignment],
+    role_assignments: list[RoleAssignment],
     subscription_name: Optional[str] = None,
     subscription_number: Optional[str] = None,
     role_type: Optional[str] = None
@@ -175,16 +177,23 @@ class BaseCommand(click.Command):
 
 
 @cli.command(cls=BaseCommand)
-def list(tenant_id: str, subscription_name: str = None, subscription_number: str = None, role_type: str = None):
+def list(tenant_id: str, subscription_name: Optional[str] = None, subscription_number: Optional[str] = None, role_type: Optional[str] = None):
     # TODO: Add filtering
     try:
         if not tenant_id:
             raise ValueError("You must provide a value for 'tenant_id'.")
         pim_token, subject = get_pim_access_token(tenant_id)
-        subject_id = subject.get("id")
-        role_assignments = get_role_assignments(subject_id, token=pim_token)
-        for role_assignment in role_assignments:
-            print(f"- {role_assignment.roleDefinition.resource.displayName}: {role_assignment.roleDefinition.displayName}")
+        subject_id = subject["id"]
+        grouped_roles = {}
+        for role_assignment in get_role_assignments(subject_id, pim_token):
+            subscription_name = role_assignment.roleDefinition.resource.displayName
+            if subscription_name not in grouped_roles:
+                grouped_roles[subscription_name] = []
+            grouped_roles[subscription_name].append(role_assignment.roleDefinition.displayName)
+        for subscription, roles in grouped_roles.items():
+            print(f"- {subscription}:")
+            for role in roles:
+                print(f"\t- {role}")
     except KeyboardInterrupt:
         sys.exit(1)
     except ValueError as err:
@@ -193,15 +202,15 @@ def list(tenant_id: str, subscription_name: str = None, subscription_number: str
 
 
 @cli.command(cls=BaseCommand)
-def activate(tenant_id: str, subscription_name: str = None, subscription_number: str = None, role_type: str = None):
+def activate(tenant_id: str, subscription_name: Optional[str] = None, subscription_number: Optional[str] = None, role_type: Optional[str] = None):
     try:
         if not tenant_id:
             raise ValueError("You must provide a value for 'tenant_id'.")
         if not subscription_name and not subscription_number:
             raise ValueError("You must specify either 'subscription_name' or 'subscription_number'.")
         pim_token, subject = get_pim_access_token(tenant_id)
-        subject_id = subject.get("id")
-        role_assignments = get_role_assignments(subject_id, token=pim_token)
+        subject_id = subject["id"]
+        role_assignments = get_role_assignments(subject_id, pim_token)
         role_assignment = get_role_assignment_by_subscription(
             role_assignments,
             subscription_name=subscription_name,
