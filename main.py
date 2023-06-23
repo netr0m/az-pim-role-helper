@@ -1,8 +1,10 @@
 import os
 import sys
 from typing import Optional, Tuple
+from pathlib import Path
+
 from requests import HTTPError, Request, Session
-from azure.identity import InteractiveBrowserCredential
+from azure.identity import InteractiveBrowserCredential, TokenCachePersistenceOptions, AuthenticationRecord
 import click
 
 from models import *
@@ -14,6 +16,22 @@ from const import (
 )
 
 TENANT_ID = os.getenv("TENANT_ID")
+__CRED_CACHE_PATH: Path = Path(__file__).with_stem(".az-pim-role-helper").with_suffix(".cache")
+
+
+def __load_cred_cache() -> Optional[AuthenticationRecord]:
+    if not __CRED_CACHE_PATH.is_file():
+        return None
+
+    with open(__CRED_CACHE_PATH, "r") as fh:
+        cred_cache = fh.read()
+
+    return AuthenticationRecord.deserialize(cred_cache)
+
+
+def __write_cred_cache(record: AuthenticationRecord):
+    with open(__CRED_CACHE_PATH, "w") as fh:
+        fh.write(record.serialize())
 
 
 def get_pim_access_token(tenant_id: str) -> Tuple[str, dict[str, str]]:
@@ -23,9 +41,22 @@ def get_pim_access_token(tenant_id: str) -> Tuple[str, dict[str, str]]:
     Returns an access token and details about the signed-in user
     """
     try:
-        print("Opening browser for Interactive Authentication...")
-        credentials = InteractiveBrowserCredential(tenant_id=tenant_id, authority=AZ_AUTHORITY)
+        # Attempt to load from cache
+        _cred_cache = __load_cred_cache()
+        kwargs = {
+            "cache_persistence_options": TokenCachePersistenceOptions(allow_unencrypted_storage=True),
+            "authentication_record": _cred_cache,
+        }
+        # Run interactive auth
+        if not _cred_cache:
+            print("Opening browser for Interactive Authentication...")
+            kwargs["tenant_id"] = tenant_id
+            kwargs["authority"] = AZ_AUTHORITY
+        credentials = InteractiveBrowserCredential(**kwargs)
         token = credentials.get_token(AZ_PIM_SCOPE).token
+        # Cache the token
+        _record = credentials.authenticate()
+        __write_cred_cache(_record)
         if not credentials._auth_record:
             raise
 
